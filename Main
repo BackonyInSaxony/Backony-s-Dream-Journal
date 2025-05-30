@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Dream Journal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font import */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #ece9e6, #ffffff); /* Subtle gradient background */
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Modal specific styles */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content {
+            transform: translateY(-20px);
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        .modal-open .modal-content {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .modal-closed .modal-content {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        /* Dream card animation on add/delete */
+        .dream-card-enter {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .dream-card-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .dream-card-exit {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .dream-card-exit-active {
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        /* Disabled button style */
+        .btn-disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-8 sm:p-10 lg:p-12 space-y-8">
+        <header class="text-center mb-10">
+            <h1 class="text-5xl font-extrabold text-gray-900 leading-tight tracking-tight mb-4">
+                My Dream Journal
+            </h1>
+            <p class="text-lg text-gray-600">
+                Documenting the adventures and oddities of the subconscious mind.
+            </p>
+        </header>
+
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-8">
+            <button id="addDreamBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75 btn-disabled" aria-label="Add a new dream entry" disabled>
+                Add New Dream
+            </button>
+            <button id="sortDreamsBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75" aria-label="Sort dreams by date">
+                Sort by Date: Most Current
+            </button>
+            <button id="exportDreamsBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75" aria-label="Export all dreams">
+                Export Dreams
+            </button>
+        </div>
+
+        <div class="mb-8">
+            <input type="text" id="searchDreamsInput" placeholder="Search dreams by title or content..." class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg">
+        </div>
+
+        <main id="dreamEntries" class="space-y-10">
+            </main>
+    </div>
+
+    <div id="passwordModal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden opacity-0" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-6 w-full max-w-sm relative">
+            <h3 id="passwordModalTitle" class="text-2xl font-bold text-gray-800 mb-6 text-center">Enter Password</h3>
+            <form id="passwordForm" class="space-y-4">
+                <div>
+                    <label for="passwordInput" class="sr-only">Password</label>
+                    <input type="password" id="passwordInput" name="passwordInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Password" required>
+                </div>
+                <p id="passwordMessage" class="text-center text-sm text-red-600 hidden">Incorrect password. Please try again.</p>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Submit
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="dreamFormModal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden opacity-0" role="dialog" aria-modal="true" aria-labelledby="dreamFormModalTitle">
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-6 w-full max-w-md relative">
+            <button id="closeDreamFormModalBtn" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold" aria-label="Close dialog">&times;</button>
+            <h3 id="dreamFormModalTitle" class="text-2xl font-bold text-gray-800 mb-6 text-center">Add New Dream</h3>
+            <form id="dreamForm" class="space-y-4">
+                <input type="hidden" id="dreamId" name="dreamId">
+                <div>
+                    <label for="dreamTitle" class="block text-sm font-medium text-gray-700 mb-1">Dream Title</label>
+                    <input type="text" id="dreamTitle" name="dreamTitle" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., Flying through clouds" required>
+                </div>
+                <div>
+                    <label for="dreamDate" class="block text-sm font-medium text-gray-700 mb-1">Date (DD/MM/YYYY)</label>
+                    <input type="text" id="dreamDate" name="dreamDate" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., 25/12/2024" pattern="\d{2}/\d{2}/\d{4}" title="Please use DD/MM/YYYY format" required>
+                </div>
+                <div>
+                    <label for="dreamContent" class="block text-sm font-medium text-gray-700 mb-1">Dream Content</label>
+                    <textarea id="dreamContent" name="dreamContent" rows="6" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Describe your dream here..." required></textarea>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Save Dream
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="confirmationModal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden opacity-0" role="dialog" aria-modal="true" aria-labelledby="confirmationModalTitle">
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-6 w-full max-w-sm relative text-center">
+            <h3 id="confirmationModalTitle" class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
+            <p class="text-gray-700 mb-6">Are you sure you want to delete this dream entry?</p>
+            <div class="flex justify-center gap-4">
+                <button id="confirmDeleteBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                    Delete
+                </button>
+                <button id="cancelDeleteBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Constants and Initial Data ---
+        const CORRECT_PASSWORD = 'DreamJournal2025!';
+        const DREAM_CARD_COLORS = [
+            'from-blue-50 to-indigo-100 border-blue-200 text-indigo-800',
+            'from-green-50 to-teal-100 border-green-200 text-teal-800',
+            'from-purple-50 to-pink-100 border-purple-200 text-purple-800',
+            'from-yellow-50 to-orange-100 border-yellow-200 text-orange-800',
+            'from-red-50 to-rose-100 border-red-200 text-rose-800',
+            'from-gray-50 to-slate-100 border-gray-200 text-slate-800',
+            'from-cyan-50 to-blue-100 border-cyan-200 text-blue-800'
+        ];
+
+        // Initial dream data
+        let dreams = [
+            { id: 'd1', title: 'Drink after a battle', date: '05/02/2025', content: `This dream was a little weird. I was on a team with red guys (who seemed to be those guys from the game TABS), and there were some of us (I'd say 25 - 50). The opposing team was, of course, blue. This seems a lot like a match on TABS (If you played the game, you'd know what I mean), Both teams were equipped with muskets and had 1800s European army attire. I don't quite remember where we fought, but I think we fought on the "simulation" map or whatever it's called. The map is just a big flat white plane.\n\nI don't remember the confrontation (or if there was even one at all), but I do remember what happened after it. I then teleported in my kitchen, with a couple of red guys from my team. We were all drinking Corona (The beer with 20% alcohol), they were then telling me to take the "Golden Eraser". A yellow eraser with a fancy 'G' printed on it. It was at a cabinet near me, I took it out from it and putted it in my mouth. Then I woke up.\n\nThat's the most I remember from that dream!` },
+            { id: 'd2', title: 'Fighting a kid on the school yard', date: '01/05/2025', content: `It’s been a while since I last documented a dream, and this one was quite violent.\n\nI can't recall the exact starting place or earlier events, but I remember being with some random guys who were supposed to be my "friends." We were playing in a schoolyard that looked somewhat different, and it was slightly foggy. Suddenly, a redhead kid with round glasses, freckles, and possibly a buck tooth approached us. He looked like the stereotypical nerd, but a redhead. He seemed to be about 8 years old, maybe in 3rd or 4th grade. For no apparent reason, he decided to attack us, and I was the only one who actually fought back!\n\nWe ended up fighting, though I can't remember much of the actual confrontation. I do recall that I was incredibly fast, while he hit and ran like a typical 8-year-old. As a result, I defeated him in the fight.\n\nThat’s about all I remember from the dream, it was super weird. I also remember the schoolyard having one of those small circular area filled with dirt and red rock, with a long fence running around a quarter of its perimeter (I don't know what they're called).` },
+            { id: 'd3', title: 'Weird school thing', date: '13/05/2025', content: `It's another dream about school, I remember it being recess, and I was playing so it could've possibly taken place while I was in 5-6th grade, during the morning. It was at the field of the school, and there was a giant foam that was around 10 times taller than our school that could've been possibly gum, but it was very foamy yet dense. the color itself was purple and blue, the colors were of course blended with patches of just those colors. I ate the foam and tasted like bubblegum. I liked it and I ate a lot, and others were too. I remember looking away then looking back, the foam was gone. It seemed like everyone ate it. Anyways, I went to play on the field, with... whatever game I played, and I went inside the school where I think my dream ended.` },
+            { id: 'd4', title: 'Cooking some Pancakes', date: '14/05/2025', content: `First, I need to say that on April 8th, I was cooking some pancakes (Which had too much flour), so this may had caused this dream.\n\nAnyways, this time, it wasn't a dream about school, it was a dream that took place at my house. I couldn't remember much, but I do remember me and probably my mom cooking pancakes or crepes with me at morning or noon. The only thing I remember doing in that dream was pouring evaporated milk (the exact brand I had in my house), onto the batter, and the batter was in a pan. Alright so, WHY THE HELL IS THERE BATTER ON A PAN! You're supposed to mix it in a separate container! Whatever, this was just a dream. Well, that's all :D` },
+            { id: 'd5', title: 'Eating human meat', date: '15/05/2025', content: `Now, this has to be in my list of my REALLY weird dreams (definitely top 20).\n\nI remember eating some raw human meat and I was critiquing its taste and its texture. I vividly remember walking around the house and my auntie in the kitchen who had a BIG portion of human meat on the kitchen table that seemed to be the back of a human, but there were some rib bones (a little larger than usual), I'm not too sure since I haven't went to the kitchen myself. The meat's texture was similar to that of a fish, but it felt like it had its own texture... the taste? I don't remember, but it could've been like a combination of some fish and pork or something else similar. It seemed to be noon since I saw the outside, and that's it.` },
+            { id: 'd6', title: 'Selling stuff', date: '18/05/2025', content: `Alright, so I wanna say that I've been playing the ROBLOX game "Grow a Garden" for a while now, so this may be the cause.\n\nSo, I was in this place, it seemed to be evening. It was a giant farmer's market, and I was the owner of this stand that had a red and white horizontally striped awning, with brown wood structure. It was super chill, I've managed to get one or two customers, but I knew this guy that was wearing a red shirt that reminded me that I should "call my fruits for 200 dollars so they sell for more". I got no damn idea why "calling" your fruits is even possible but it worked.\n\nEach of our stands were lit with some LED light strip, or some unknown source, mine lit sky blue. We were placed in order, and were around 5 meters apart on the sidewalk (we were placed on both of the sidewalks), and 8 meters apart. At the other side, there was this ordinary park, but in the evening light, it looked sort of nice to go in. And for some reason, there was a huge corporate building behind us, the generic kind you would find in cartoons.\n\nThere were some people walking the other side of the sidewalk, walking like NPCs (No like, actually). I don't remember much of the events of the dream, but it was relaxing for the most part.` },
+            { id: 'd7', title: 'Weird school thing', date: '21/05/2025', content: `It was a dream about school, but I forgot a bunch of the events. The only thing I remember from that dream is thar I approached Brandon and he had an entire pack of Bavarian sausages. I asked him if I could have one but he responded to me with "no".` },
+            { id: 'd8', title: 'idk what to even say', date: '22/05/2025', content: `These are one of the few vivid dreams that I actually remember. So, I was in this house in this random neighborhood. So, I was in this house with around 30 7-12 year old girls with one woman, probably in her mid-20s being in charge, and I was somehow in this house with them. They were basically running a campaign where they were cooking hamburgers(?) for some orphanage, to do it, they had a huge machine in the house's kitchen (a part the roof literally had to be extended) that was used to make these burgers. It had conveyor belts, one electronic-sign, and it was a cool machine. I was just looking around the living room, I look at the machine, then I looked back, with everyone gone! I remember that they left, but they just disappeared out of thin air. The only person left was this 7 year old operating the machine.\n\nI had for some reason a bottle that seemed like those Magi bottles but it was larger and had some strange labeling, I poured some of the liquid inside the bottle on one of the conveyor belts, and the girl in the kitchen gasped and called the police, I don't know what have I done wrong but that happened. A weird thing I found about it was that the liquid stayed on the conveyor belt and it was vaporizing. Anyways, while she was calling the police, I had this countdown on my wrist, it was a white-colored and black outlined 2D text that was counting down in seconds, I thought it was the time until the police arrives, but it was going back to 36 - 37 after some time, so I forgot about it. I looked outside the window briefly, and the neighborhood looked like your average suburban neighborhood. There was a stone wall with the word "Science" in bronze, which I assume is the neighborhood's name.\n\nSo, I ran into the closet of the bedroom, and for some reason, I've been able to look outside of the closet since it was really transparent (not completely) from the inside. I sat down, legs close to torso and arms covering them. Then, it gets slightly more weirder. There was a bar in my view (it looked like I was viewing through a screen), an orange one. It had a circle that was near the end of the bar. I put the circle in the very end, and there was a Game Over music theme playing, the ones from the 2000s (I forgot which one it sounded like). I was probably found and died from the girls or the police. After that, the dream ended and I woke up. Geez, that was something.` }
+        ];
+
+        // --- DOM Element References ---
+        const addDreamBtn = document.getElementById('addDreamBtn');
+        const sortDreamsBtn = document.getElementById('sortDreamsBtn');
+        const exportDreamsBtn = document.getElementById('exportDreamsBtn');
+        const searchDreamsInput = document.getElementById('searchDreamsInput');
+        const dreamEntriesContainer = document.getElementById('dreamEntries');
+
+        // Modals
+        const passwordModal = document.getElementById('passwordModal');
+        const passwordForm = document.getElementById('passwordForm');
+        const passwordInput = document.getElementById('passwordInput');
+        const passwordMessage = document.getElementById('passwordMessage');
+
+        const dreamFormModal = document.getElementById('dreamFormModal');
+        const closeDreamFormModalBtn = document.getElementById('closeDreamFormModalBtn');
+        const dreamForm = document.getElementById('dreamForm');
+        const dreamFormModalTitle = document.getElementById('dreamFormModalTitle');
+        const dreamIdInput = document.getElementById('dreamId');
+        const dreamTitleInput = document.getElementById('dreamTitle');
+        const dreamDateInput = document.getElementById('dreamDate');
+        const dreamContentInput = document.getElementById('dreamContent');
+
+        const confirmationModal = document.getElementById('confirmationModal');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+
+        // --- State Variables ---
+        let isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true'; // Persist auth status
+        let sortOrder = 'desc'; // Default to Most Current first
+        let dreamToDeleteId = null; // Store ID of dream to be deleted
+
+        // --- Helper Functions ---
+
+        /**
+         * Opens a modal with a fade-in and slide-down effect.
+         * @param {HTMLElement} modalElement - The modal element to open.
+         */
+        function openModal(modalElement) {
+            modalElement.classList.remove('hidden', 'modal-closed');
+            modalElement.classList.add('flex', 'modal-open');
+            void modalElement.offsetWidth; // Force reflow for transition
+            modalElement.style.opacity = '1';
+        }
+
+        /**
+         * Closes a modal with a fade-out and slide-up effect.
+         * @param {HTMLElement} modalElement - The modal element to close.
+         */
+        function closeModal(modalElement) {
+            modalElement.style.opacity = '0';
+            modalElement.classList.remove('modal-open');
+            modalElement.classList.add('modal-closed');
+            setTimeout(() => {
+                modalElement.classList.remove('flex');
+                modalElement.classList.add('hidden');
+            }, 300); // Match transition duration
+        }
+
+        /**
+         * Parses a DD/MM/YYYY date string into a Date object.
+         * @param {string} dateString - The date string in DD/MM/YYYY format.
+         * @returns {Date} A Date object.
+         */
+        function parseDate(dateString) {
+            const parts = dateString.split('/');
+            // Date constructor expects YYYY, MM (0-indexed), DD
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+
+        /**
+         * Formats a Date object into a DD/MM/YYYY string.
+         * @param {Date} date - The Date object.
+         * @returns {string} The formatted date string.
+         */
+        function formatDate(date) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        /**
+         * Generates a unique ID for new dreams.
+         * @returns {string} A unique ID.
+         */
+        function generateUniqueId() {
+            return 'd' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        }
+
+        /**
+         * Updates the UI based on authentication status.
+         */
+        function updateUIForAuth() {
+            if (isAuthenticated) {
+                addDreamBtn.classList.remove('btn-disabled');
+                addDreamBtn.disabled = false;
+                // Show edit/delete buttons on existing cards
+                document.querySelectorAll('.dream-card').forEach(card => {
+                    if (!card.querySelector('.dream-actions')) { // Avoid adding multiple times
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.classList.add('dream-actions', 'flex', 'gap-2', 'mt-4');
+                        actionsDiv.innerHTML = `
+                            <button class="edit-dream-btn bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-md transition-colors duration-200" aria-label="Edit dream">Edit</button>
+                            <button class="delete-dream-btn bg-red-500 hover:bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-md transition-colors duration-200" aria-label="Delete dream">Delete</button>
+                        `;
+                        card.appendChild(actionsDiv);
+                    }
+                });
+            } else {
+                addDreamBtn.classList.add('btn-disabled');
+                addDreamBtn.disabled = true;
+                // Hide edit/delete buttons
+                document.querySelectorAll('.dream-actions').forEach(actionsDiv => {
+                    actionsDiv.remove();
+                });
+            }
+        }
+
+        /**
+         * Renders all dreams to the DOM based on the current 'dreams' array.
+         * Applies search filter if active.
+         */
+        function renderDreams() {
+            dreamEntriesContainer.innerHTML = ''; // Clear existing dreams
+            const searchQuery = searchDreamsInput.value.toLowerCase();
+
+            // Sort dreams based on current sortOrder
+            const sortedDreams = [...dreams].sort((a, b) => {
+                const dateA = parseDate(a.date);
+                const dateB = parseDate(b.date);
+                if (sortOrder === 'asc') {
+                    return dateA - dateB; // Earliest to Most Current
+                } else {
+                    return dateB - dateA; // Most Current to Earliest
+                }
+            });
+
+            sortedDreams.forEach((dream, index) => {
+                const titleLower = dream.title.toLowerCase();
+                const contentLower = dream.content.toLowerCase();
+
+                // Apply search filter
+                if (searchQuery && !titleLower.includes(searchQuery) && !contentLower.includes(searchQuery)) {
+                    return; // Skip if no match
+                }
+
+                const dreamCard = document.createElement('div');
+                // Cycle through predefined colors
+                const colorClass = DREAM_CARD_COLORS[index % DREAM_CARD_COLORS.length];
+                const [from, to, border, titleColor] = colorClass.split(' ').filter(c => c.includes('-'));
+
+                dreamCard.classList.add(
+                    'dream-card', 'p-6', 'rounded-lg', 'shadow-md', 'hover:shadow-lg',
+                    'transition-shadow', 'duration-300', 'dream-card-enter',
+                    `bg-gradient-to-br`, from, to, border // Apply gradient and border classes
+                );
+                dreamCard.setAttribute('data-id', dream.id);
+                dreamCard.setAttribute('data-date', `${parseDate(dream.date).getFullYear()}-${String(parseDate(dream.date).getMonth() + 1).padStart(2, '0')}-${String(parseDate(dream.date).getDate()).padStart(2, '0')}`);
+
+                dreamCard.innerHTML = `
+                    <h2 class="text-2xl sm:text-3xl font-bold ${titleColor} mb-2">${dream.title}</h2>
+                    <p class="text-sm text-gray-600 mb-4">
+                        <span class="font-semibold">Date:</span> ${dream.date}
+                    </p>
+                    <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">${dream.content}</p>
+                `;
+
+                // Add edit/delete buttons if authenticated
+                if (isAuthenticated) {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.classList.add('dream-actions', 'flex', 'gap-2', 'mt-4');
+                    actionsDiv.innerHTML = `
+                        <button class="edit-dream-btn bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-md transition-colors duration-200" aria-label="Edit dream">Edit</button>
+                        <button class="delete-dream-btn bg-red-500 hover:bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-md transition-colors duration-200" aria-label="Delete dream">Delete</button>
+                    `;
+                    dreamCard.appendChild(actionsDiv);
+                }
+
+                dreamEntriesContainer.appendChild(dreamCard);
+
+                // Trigger animation
+                setTimeout(() => {
+                    dreamCard.classList.add('dream-card-enter-active');
+                }, 10);
+            });
+
+            // Re-attach event listeners for edit/delete buttons
+            attachDreamCardListeners();
+        }
+
+        /**
+         * Attaches event listeners to dynamically created edit and delete buttons.
+         * This needs to be called after rendering or re-rendering dreams.
+         */
+        function attachDreamCardListeners() {
+            document.querySelectorAll('.edit-dream-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const dreamCard = event.target.closest('.dream-card');
+                    const dreamId = dreamCard.getAttribute('data-id');
+                    editDream(dreamId);
+                };
+            });
+
+            document.querySelectorAll('.delete-dream-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const dreamCard = event.target.closest('.dream-card');
+                    const dreamId = dreamCard.getAttribute('data-id');
+                    showDeleteConfirmation(dreamId);
+                };
+            });
+        }
+
+        // --- Core Functionality ---
+
+        /**
+         * Handles password submission.
+         * @param {Event} event - The form submission event.
+         */
+        function handlePasswordSubmit(event) {
+            event.preventDefault();
+            const enteredPassword = passwordInput.value;
+
+            if (enteredPassword === CORRECT_PASSWORD) {
+                isAuthenticated = true;
+                sessionStorage.setItem('isAuthenticated', 'true');
+                passwordMessage.classList.add('hidden');
+                closeModal(passwordModal);
+                updateUIForAuth();
+                renderDreams(); // Re-render to show edit/delete buttons
+            } else {
+                passwordMessage.textContent = 'Incorrect password. Please try again.';
+                passwordMessage.classList.remove('hidden');
+                passwordInput.value = ''; // Clear input
+            }
+        }
+
+        /**
+         * Opens the add/edit dream modal.
+         * @param {object|null} dreamData - Pre-fill data for editing, or null for new dream.
+         */
+        function openDreamFormModal(dreamData = null) {
+            dreamForm.reset(); // Clear form
+            passwordMessage.classList.add('hidden'); // Hide password error message
+
+            if (dreamData) {
+                // Editing existing dream
+                dreamFormModalTitle.textContent = 'Edit Dream';
+                dreamIdInput.value = dreamData.id;
+                dreamTitleInput.value = dreamData.title;
+                dreamDateInput.value = dreamData.date;
+                dreamContentInput.value = dreamData.content;
+            } else {
+                // Adding new dream
+                dreamFormModalTitle.textContent = 'Add New Dream';
+                dreamIdInput.value = ''; // Clear ID for new dream
+            }
+            openModal(dreamFormModal);
+        }
+
+        /**
+         * Handles saving a new or edited dream.
+         * @param {Event} event - The form submission event.
+         */
+        function saveDream(event) {
+            event.preventDefault();
+
+            const id = dreamIdInput.value;
+            const title = dreamTitleInput.value;
+            const date = dreamDateInput.value;
+            const content = dreamContentInput.value;
+
+            // Basic date format validation
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+                console.error("Invalid date format. Please use DD/MM/YYYY.");
+                // In a real app, you'd show a user-friendly error message here.
+                return;
+            }
+
+            if (id) {
+                // Editing existing dream
+                const dreamIndex = dreams.findIndex(d => d.id === id);
+                if (dreamIndex !== -1) {
+                    dreams[dreamIndex] = { id, title, date, content };
+                }
+            } else {
+                // Adding new dream
+                const newDream = {
+                    id: generateUniqueId(),
+                    title,
+                    date,
+                    content
+                };
+                dreams.push(newDream);
+            }
+
+            closeModal(dreamFormModal);
+            renderDreams(); // Re-render all dreams to reflect changes and sorting
+        }
+
+        /**
+         * Initiates the edit process for a specific dream.
+         * @param {string} dreamId - The ID of the dream to edit.
+         */
+        function editDream(dreamId) {
+            const dream = dreams.find(d => d.id === dreamId);
+            if (dream) {
+                openDreamFormModal(dream);
+            }
+        }
+
+        /**
+         * Shows the confirmation modal before deleting a dream.
+         * @param {string} dreamId - The ID of the dream to delete.
+         */
+        function showDeleteConfirmation(dreamId) {
+            dreamToDeleteId = dreamId;
+            openModal(confirmationModal);
+        }
+
+        /**
+         * Deletes a dream after confirmation.
+         */
+        function deleteDream() {
+            if (dreamToDeleteId) {
+                const dreamCardElement = document.querySelector(`.dream-card[data-id="${dreamToDeleteId}"]`);
+                if (dreamCardElement) {
+                    // Start exit animation
+                    dreamCardElement.classList.add('dream-card-exit');
+                    dreamCardElement.classList.remove('dream-card-enter-active');
+
+                    setTimeout(() => {
+                        dreams = dreams.filter(d => d.id !== dreamToDeleteId);
+                        dreamCardElement.remove(); // Remove from DOM after animation
+                        dreamToDeleteId = null; // Reset
+                        closeModal(confirmationModal);
+                        renderDreams(); // Re-render to ensure consistent state and re-apply colors
+                    }, 500); // Match animation duration
+                }
+            }
+        }
+
+        /**
+         * Toggles the sort order of dreams and re-renders them.
+         */
+        function toggleSortOrder() {
+            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            sortDreamsBtn.textContent = `Sort by Date: ${sortOrder === 'asc' ? 'Earliest' : 'Most Current'}`;
+            renderDreams();
+        }
+
+        /**
+         * Filters dreams based on search input.
+         */
+        function filterDreams() {
+            renderDreams(); // Re-render will apply the search filter
+        }
+
+        /**
+         * Exports all dreams to a text file.
+         */
+        function exportDreams() {
+            let exportText = "My Dream Journal Entries\n\n";
+            dreams.forEach(dream => {
+                exportText += `--- Dream: ${dream.title} ---\n`;
+                exportText += `Date: ${dream.date}\n`;
+                exportText += `Content:\n${dream.content}\n\n`;
+            });
+
+            const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'my_dream_journal.txt';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href); // Clean up
+        }
+
+        // --- Event Listeners ---
+
+        // Password protection
+        addDreamBtn.addEventListener('click', () => {
+            if (!isAuthenticated) {
+                openModal(passwordModal);
+                passwordInput.focus();
+            } else {
+                openDreamFormModal(); // Open directly if already authenticated
+            }
+        });
+        passwordForm.addEventListener('submit', handlePasswordSubmit);
+
+        // Dream Form Modal
+        closeDreamFormModalBtn.addEventListener('click', () => closeModal(dreamFormModal));
+        dreamForm.addEventListener('submit', saveDream);
+
+        // Confirmation Modal
+        confirmDeleteBtn.addEventListener('click', deleteDream);
+        cancelDeleteBtn.addEventListener('click', () => {
+            closeModal(confirmationModal);
+            dreamToDeleteId = null; // Clear ID
+        });
+
+        // Other main buttons
+        sortDreamsBtn.addEventListener('click', toggleSortOrder);
+        exportDreamsBtn.addEventListener('click', exportDreams);
+        searchDreamsInput.addEventListener('input', filterDreams);
+
+        // --- Initial Setup ---
+        // Render initial dreams and update UI based on authentication status
+        renderDreams();
+        updateUIForAuth();
+    </script>
+</body>
+</html>
